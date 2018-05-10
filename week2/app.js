@@ -1,42 +1,114 @@
-'use strict'
+'use strict';
+const url = "https://api.github.com/orgs/HackYourFuture/repos?per_page=100";
 
-{
-    const API = {
-        endpoints: {
-            laureate: 'http://api.nobelprize.org/v1/laureate.json?',
-            prize: 'http://api.nobelprize.org/v1/prize.json?'
-        },
-        queries: [{
-            description: 'All female laureates',
-            endpoint: 'laureate',
-            queryString: 'gender=female'
-        }]
-    };
-
-    const xhr = new XMLHttpRequest();
-    xhr.open("GET", url);
-    xhr.responseType = 'json';
-    xhr.onreadystatechange = () => {
-
-        if (xhr.readyState === 4) {
-            if (xhr.readyState < 400) {
-                cb(null, xhr.response)
-
-            } else {
-                cb(new Error(xhr.statusText))
-
+function fetchJSON(url) {
+    return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url);
+        xhr.responseType = 'json';
+        xhr.onreadystatechange = () => {
+            if (xhr.readyState === 4) {
+                if (xhr.status < 400) {
+                    resolve(xhr.response);
+                } else {
+                    reject(new Error(xhr.statusText));
+                }
             }
-        }
-    };
-    xhr.send();
-
+        };
+        xhr.send();
+    });
 }
-const url = API.endpoints.laureate + API.queries[0].queryString;
 
-function callBack(error, data) {
-    if (error !== null) {
-
-    }
-
+function renderToolBar() {
+    let root = document.getElementById('root');
+    let listItem = createAndAppend('div', root);
+    listItem.id = 'listItem';
+    let listItemName = createAndAppend('p', listItem);
+    listItemName.innerHTML = 'HYF Repositories';
+    let select = createAndAppend('select', listItem);
+    select.id = 'selectElement';
+    let errorDiv = createAndAppend('div', root);
+    errorDiv.id = 'error-container';
+    let repositoryContainer = createAndAppend('div', root);
+    repositoryContainer.id = 'repo-container';
+    let contributorContainer = createAndAppend('div', root);
+    contributorContainer.id = 'contribs-container';
+    select.addEventListener("change", () => repositoryInfo(select.value));
 }
-fetchJSON(url, callBack);
+
+function renderRepository(repository) {
+    let select = document.getElementById('selectElement');
+    repository.forEach(repository => {
+        let option = createAndAppend('option', select);
+        option.innerHTML = repository.name;
+        option.setAttribute('value', repository.name);
+    });
+    repositoryInfo(select.value);
+}
+
+function createAndAppend(tageName, parent) {
+    let element = document.createElement(tageName);
+    parent.appendChild(element);
+    return element;
+}
+
+function repositoryInfo(repositoryName) {
+    let repositoryUrl = 'https://api.github.com/repos/HackYourFuture/' + repositoryName;
+    fetchJSON(repositoryUrl)
+        .then(repodata => {
+            return fetchJSON(repodata.contributors_url)
+                .then(contributors => {
+                    renderRepositoryToHTML(repodata);
+                    renderContributors(contributors);
+                });
+        })
+        .catch(err => {
+            let errorContainer = document.getElementById('error-container');
+            errorContainer.innerHTML = err.message;
+        });
+}
+
+
+function renderRepositoryToHTML(repositoryInfo) {
+    let repositoryContainer = document.getElementById('repo-container');
+    repositoryContainer.innerHTML = '';
+    let p = createAndAppend('p', repositoryContainer);
+    let repositoryName = createAndAppend('p', repositoryContainer);
+    let forks = createAndAppend('p', repositoryContainer);
+    let updated = createAndAppend('p', repositoryContainer);
+    repositoryName.innerHTML = 'Repository: &nbsp;&nbsp;&nbsp;' + repositoryInfo.name;
+    forks.innerHTML = 'Forks: &nbsp;&nbsp;&nbsp;' + repositoryInfo.forks_count;
+    updated.innerHTML = 'Updated: &nbsp;&nbsp;&nbsp;' + repositoryInfo.updated_at;
+    p.innerHTML = 'Description: &nbsp;&nbsp;&nbsp;' + repositoryInfo.description;
+}
+
+function renderContributors(contributors) {
+    let container = document.getElementById('contribs-container');
+    container.innerHTML = '';
+    let Contributions = createAndAppend('p', container);
+    Contributions.innerHTML = 'Contributions';
+    let ul = createAndAppend('ul', container);
+    contributors.forEach(contributor => {
+        let li = createAndAppend('li', ul);
+        li.innerHTML = "";
+        let img = createAndAppend('img', li);
+        li.innerHTML = contributor.login + " &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; " + contributor.contributions + "<img src=" + contributor.avatar_url + ">";
+        img.setAttribute('src', contributor.avatar_url);
+        li.setAttribute('value', contributor.login);
+    });
+}
+
+
+function main() {
+    renderToolBar();
+    fetchJSON(url)
+        .then(repos => {
+            renderRepository(repos);
+        })
+        .catch(err => {
+            let errorContainer = document.getElementById('error-container');
+            errorContainer.innerHTML = err.message;
+        });
+}
+
+window.onload = main;
